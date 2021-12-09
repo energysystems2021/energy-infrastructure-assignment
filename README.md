@@ -1,6 +1,6 @@
-# Energy Sources Assignment Repo AY 2021/22
+# Energy Infrastructure Assignment Repo AY 2021/22
 
-This repository is for MSc Energy Systems 2021/22 students to upload code for Prof. Malcolm McCulloch's Energy Sources Assignment.
+This repository is for MSc Energy Systems 2021/22 students to upload code for Prof. Malcolm McCulloch's Energy Infrastructure Assignment.
 
 1. Log in to this account with the ID and PW sent on the WhatsApp group
 2. Create folders with your exam candidate numbers (E.g. 1234567) 
