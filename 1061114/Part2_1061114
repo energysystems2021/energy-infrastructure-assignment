@@ -7,3 +7,299 @@ import pandapower.topology as topo
 import numpy as np
 
 net = pp.create_empty_network()
+
+# STEP 2: Creation of buses
+
+HV=132 # high Voltage
+MV=11 # medium voltage
+LV=0.415 # low voltage
+ADMD=0.004
+
+
+# bus 0 is assumed to be the external grid power source
+b0 = pp.create_bus(net, vn_kv = HV,  name="Power Source")
+b1 = pp.create_bus(net, vn_kv = MV,  name="Bus 1")
+
+# These 4 buses are the MV buses just before each of the four other transformers
+# Buses 2,3,4,5
+for i in range(4):
+    pp.create_bus(net, vn_kv = MV,  name=f"Bus {i+2}")
+
+#These 4 buses are the LV buses just after each of the four other transformers
+# Buses 6,7,8,9
+for i in range(4):
+    pp.create_bus(net, vn_kv = LV,  name=f"Bus {i+6}")
+
+
+
+# the 168 houses are divided into 4 groups (A-B-C-D) each group is composed by 2 groups of 7 sets of 3 houses each. 
+
+# Group A
+#10-23
+for i in range(14):
+    pp.create_bus(net, vn_kv=LV, name=f"Bus A{i+10}") 
+
+# Group B
+#24-37
+for i in range(14):
+    pp.create_bus(net, vn_kv=LV, name=f"Bus B{i+24}") 
+
+# Group C
+#38-51
+for i in range(14):
+    pp.create_bus(net, vn_kv=LV, name=f"Bus C{i+38}") 
+
+# Group D
+#52-65
+for i in range(14):
+    pp.create_bus(net, vn_kv=LV, name=f"Bus D{i+52}") 
+
+net.bus
+
+
+
+# STEP 3: Creation the external grid 
+pp.create_ext_grid(net, bus=b0, vm_pu=1.0, name="Swing bus 0")
+
+
+
+# STEP 4: Creation of the transformers 
+
+
+# A transformer is present between buses 0 and 1 to reduce the voltage from 132 kV to 11 kV
+# Using information from https://pandapower.readthedocs.io/en/develop/std_types/basic.html#transformers tp create the transformer (25 MVA 110/10 kV)
+# Adjusting certain values linearly in the proper direction to adapt to actual voltages
+sn=2.8 #Rated appearent power in MVA
+vkr=0.91 #short circuit voltage - real component
+vk=10.0 #short circuit voltage
+pfe=14.0 #iron losses
+i0=0.17 #open loop losses
+pp.create_transformer_from_parameters(net, hv_bus=b0, lv_bus=b1, sn_mva=sn, vn_hv_kv=HV, vn_lv_kv=MV, vkr_percent=vkr, vk_percent=vk, pfe_kw=pfe, i0_percent=i0,name="Trafo 1")
+
+#There are 4 transformers for each of the 4 main roads alleys 
+# Using the 0.40 MVA 10/0.4 kV data from https://pandapower.readthedocs.io/en/develop/std_types/basic.html#transformers (0.4 MVA 10/0.4 kV), we get: 
+sn=0.5 #Rated appearent power
+vkr=1.325 #short circuit voltage - real component
+vk=4.0 #short circuit voltage
+pfe=0.95 #iron losses
+i0=0.2375 #open loop losses
+for i in range (4):
+    pp.create_transformer_from_parameters(net, hv_bus=i+2, lv_bus=i+6, sn_mva=sn, vn_hv_kv=MV, vn_lv_kv=LV, vkr_percent=vkr, vk_percent=vk, pfe_kw=pfe, i0_percent=i0,name=f"Trafo {i+2}")
+
+
+net.trafo
+
+
+
+# STEP 5: Creation of loads
+# Assuming a power factor of 0.9 (pf=0.9), gives relation of P and Q 
+# theta=ArcCos(pf)=ArcCos(0.9)=0.451
+# Reactive Power (VAR)=Q= P*tan(theta)
+# tan(theta)=0.482
+
+# variable input for use in reactive power 
+tan=0.482
+q=tan*ADMD
+
+# started by creating dummy loads to maintain / assess values of parameters
+# this shouldnt run when you test code 
+#pp.create_load(net, bus=b1, p_mw=ADMD*168, q_mvar=q*168, name="Bus 1(dummy load)") 
+#for i in range(4):
+ #   pp.create_load(net, bus=i+6, p_mw=ADMD*42, q_mvar=ADMD*42*tan, name=f"Bus {i+6}(dummy load)")
+
+# 14 buses per 42 houses, 3 houses per bus, multiply real and reactive power by 3 
+# Winter load is full ADMD, no negative solar PV (don't run next cell block) 
+# Summer load is 75% ADMD, peak solar power generation 
+
+# Only run summer or winter loads per time 
+
+# loads for Group A buses 
+for i in range (14):
+    pp.create_load(net, bus=i+10, p_mw=ADMD*3, q_mvar=q*3, name=f"Bus A{i+10}") #winter scenario
+    #pp.create_load(net, bus=i+10, p_mw=ADMD*3*0.75, q_mvar=q*3*0.75, name=f"Bus A{i+10}") #summer scenario
+
+# loads for the Group B buses
+for i in range (14):
+    pp.create_load(net, bus=i+24, p_mw=ADMD*3, q_mvar=q*3, name=f"Bus B{i+24}") #winter scenario
+    #pp.create_load(net, bus=i+24, p_mw=ADMD*3*0.75, q_mvar=q*3*0.75, name=f"Bus A{i+24}") #summer scenario
+
+# loads for the Group C buses
+for i in range (14):
+    pp.create_load(net, bus=i+38, p_mw=ADMD*3, q_mvar=q*3, name=f"Bus C{i+38}") #winter scenario
+    #pp.create_load(net, bus=i+38, p_mw=ADMD*3*0.75, q_mvar=q*3*0.75, name=f"Bus A{i+38}") #summer scenario
+
+# loads for the Group D buses
+for i in range (14):
+    pp.create_load(net, bus=i+52, p_mw=ADMD*3, q_mvar=q*3, name=f"Bus D{i+52}")
+    #pp.create_load(net, bus=i+52, p_mw=ADMD*3*0.75, q_mvar=q*3*0.75, name=f"Bus A{i+52}") #summer scenario
+net.load
+
+
+
+# STEP 6: Creation of Negative PV Loads for Summer Scenario 
+# Solar shown as negative load bc no reactive power 
+# Scenario 2 assumes that 3.4kWp given value is after efficiency taken into account 
+# Solar panels are about 10-20% efficient: scenario 3 captures this decrease in peak power, or could simulate a cloudy summer day with reduced demand 
+
+# only run one scenario at a time!!
+
+# 14 buses per 42 houses, 3 houses per bus, multiply everything by 3    
+# creating loads for the Group A buses
+for i in range (14):
+    pp.create_load(net, bus=i+10, p_mw=-0.00068*3, q_mvar=0, name=f"PV A{i+10}") #scenario 3 -- 20% of pv peak power 
+    #pp.create_load(net, bus=i+10, p_mw=-0.0.0034*3, q_mvar=0, name=f"PV A{i+10}") #scenario 2 -- peak pv power gen 
+# creating loads for the Group B buses
+for i in range (14):
+    #pp.create_load(net, bus=i+24, p_mw=-0.0034*3, q_mvar=0, name=f"PV A{i+24}") #scenario 2
+    pp.create_load(net, bus=i+24, p_mw=-0.00068*3, q_mvar=0, name=f"PV A{i+24}") #scenario 3 
+
+# creating loads for the Group C buses
+for i in range (14):
+    #pp.create_load(net, bus=i+38, p_mw=-0.0034*3, q_mvar=0, name=f"PV A{i+38}") #scenario 2
+    pp.create_load(net, bus=i+38, p_mw=-0.00068*3, q_mvar=0, name=f"PV A{i+38}") #scenario 3
+
+# creating loads for the Group D buses
+for i in range (14):
+    #pp.create_load(net, bus=i+52, p_mw=-0.0034*3, q_mvar=0, name=f"PV A{i+52}") #scenario 2
+    pp.create_load(net, bus=i+52, p_mw=-0.00068*3, q_mvar=0, name=f"PV A{i+52}") #scenario 3
+
+net.load
+
+
+
+# STEP 7: Creation of the lines 
+# Lines connect the buses
+# Total of 56 LV lines from MV/LV trafos to load buses
+# Total of 4 MV lines from HV/MV trafo to MV/LV trafos 
+# HV/MV trafo assumed to be exactly at top center of housing layout
+
+# Array of distances between bus 1 (MV bus of HV/MV transformer) and MV bus of 4 MV/LV transformers in Groups A,B,C,D
+a = np.array([0.620,0.390,0.390,0.620],dtype=float)
+# Array of LV line lengths from the MV/LV transformer to 3-dwelling load buses in numerical order corresponding to diagram in report 
+# On graphic, LV lines always connected to blue houses for consistency 
+b = np.array([0.280,0.230,0.130,0.08,0.08,0.230,0.230,0.330,0.180,0.180,0.03,0.130,0.180,0.280],dtype=float)
+
+# Line values for medium voltage BS 7835 from https://www.elandcables.com/media/wdvdqb43/bs-7835-aluminium-awa-swa-lszh-3-8-6-6kv-cable.pdf 
+# 120mm2 cross sectional area 
+# Steel armoured and insulated cable because underground
+r_m=0.253 #resistance in ohms per km
+x_m=0.09111 #reactance at 50Hz in ohms per km calculated by x_inductive = 2 * pi * f * L (L, inductance, given in miliHenrys/km)
+c_f=0.44E-9 #capacitance in mu F/km
+maxka=.271 # maximal thermal current capacity in kA
+
+# 4 Lines from bus 1 at HV/MV trafo to 4 MV buses on side of MV/LV tafos 
+
+for i in range (4):
+    pp.create_line_from_parameters(net,from_bus=b1, to_bus=i+2,length_km=a[i], r_ohm_per_km = r_m, x_ohm_per_km = x_m, c_nf_per_km = c_f, max_i_ka=maxka, parallel = 1)
+
+# BS 5467 from https://www.elandcables.com/media/3ljpmrxt/bs-5467-copper-conductor-multi-core-swa-pvc-basec-0-6-1kv-cable.pdf
+# Picked characteristics from wire area 10mm2
+# 6mm2 could accommodate load, but gives incomplete information 
+# In line with methology, oversized cable 
+r_m_LV= 1.83 #resistance in mV/A/m or ohm/km
+x_m_LV=0.0 #reactance
+#inductance can be ignored with diameter below 16mm2
+c_f_LV=25E-9 #capacitance in microFarads/km from https://www.omnicalculator.com/physics/capacitance
+maxka_LV=0.058 #max thermal current in kiliamps
+
+# Lines from the LV buses on LV side of MV/LV trafos to the numbered load buses for each group
+# Adjusts for indexing 
+for i in range(14): 
+      pp.create_line_from_parameters(net,from_bus=6, to_bus=i+10, length_km=b[i], r_ohm_per_km = r_m_LV, x_ohm_per_km = x_m_LV, c_nf_per_km = c_f_LV, max_i_ka=maxka_LV, parallel =1)
+    
+for i in range(14): 
+      pp.create_line_from_parameters(net,from_bus=7, to_bus=i+24, length_km=b[i], r_ohm_per_km = r_m_LV, x_ohm_per_km = x_m_LV, c_nf_per_km = c_f_LV, max_i_ka=maxka_LV, parallel = 1)
+        
+for i in range(14): 
+      pp.create_line_from_parameters(net,from_bus=8, to_bus=i+38, length_km=b[i], r_ohm_per_km = r_m_LV, x_ohm_per_km = x_m_LV, c_nf_per_km = c_f_LV, max_i_ka=maxka_LV, parallel = 1)
+
+for i in range(14): 
+      pp.create_line_from_parameters(net,from_bus=9, to_bus=i+52, length_km=b[i], r_ohm_per_km = r_m_LV, x_ohm_per_km = x_m_LV, c_nf_per_km = c_f_LV, max_i_ka=maxka_LV, parallel =1)
+        
+net.line 
+
+
+
+# STEP 8: Run power flow 
+pp.runpp(net,algorithm='gs');
+# Runs gauss seidel algorithm 
+
+
+
+# STEP 9: Examine results for trafos 
+net.res_trafo
+# Explanation of variables and criteria for success
+# vm_pu = voltage_at_bus / vn_kv 
+# vm_pu shouldnt exceed 1 or dip below 0.9 
+# va_degree negative means current is leading 
+# loading percent should be below 100% 
+
+
+
+# STEP 10: Examine results for lines 
+net.res_line
+# first 4 lines are lines from MV side of HV/MV trafo to MV side of MV/LV trafo
+
+# from https://pandapower.readthedocs.io/en/v1.3.0/elements/line.html
+#p_from_kw	float	active power flow into the line at “from” bus [kW]
+#q_from_kvar	float	reactive power flow into the line at “from” bus [kVar]
+#p_to_kw	float	active power flow into the line at “to” bus [kW]
+#q_to_kvar	float	reactive power flow into the line at “to” bus [kVar]
+#pl_kw	float	active power losses of the line [kW]
+#ql_kvar	float	reactive power consumption of the line [kVar]
+#i_from_ka	float	Current at to bus [kA]
+#i_to_ka	float	Current at from bus [kA]
+#i_ka	float	Maximum of i_from_ka and i_to_ka [kA]
+#loading_percent	float	line loading [%]
+
+
+
+# STEP 11: Examine results of loads 
+
+net.res_load
+# displays real and reactive power by bus 
+
+
+
+# STEP 12: Examine results of buses 
+
+net.res_bus.head(60)
+# displays the first 60 results, good for identifying patterns 
+# ideal to understand what is happening (in every group A-D the pattern repeats)
+
+
+
+# STEP 13: Import additional library for graphical representations 
+
+import networkx as nx
+mg = topo.create_nxgraph(net, respect_switches = True, include_lines = True, include_trafos = True, include_impedances = True )
+
+
+
+nx.draw_planar(mg) # representative drawing that doesnt display data in a great way 
+
+
+
+# STEP 14: Create indicative coordinates for buses to demonstrate power flow through distribution system 
+pplot.create_generic_coordinates(net, mg=None, library='igraph', respect_switches=True, geodata_table='bus_geodata', buses=None, overwrite=True)
+
+
+
+# STEP 15: Create simple plot 
+pplot.simple_plot(net)
+
+
+
+# STEP 16: Create plot that shows various components of system in diff colours
+pplot.vlevel_plotly(net, aspectratio=(1.2,1))
+
+
+
+# STEP 17: Create plot that shows power flow analysis results 
+pf_res_plotly(net, aspectratio=(1.2,1), climits_volt = (0.90,1.0), cpos_volt = .99) 
+# adjusted range and position of colorbar, made aspect ratio such that all components visible
+# was unable to debug map-box to show on map in geopandas outside of qgis (geopy import created clashes between pandas, geopandas, pandapower) 
+
+
+
+
