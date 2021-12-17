@@ -1,1 +1,1 @@
-Balearics code is split in half. For Power Flow Analysis with Solar and Another Without. They'll be named Solar and Base Respectively.
+Balearics code is split in half. For Power Flow Analysis with Solar and Another Without. They'll be named Solar and Base Respectively. Datasheets contains all the XLSX files required to run both codes....put them all in the same place.
