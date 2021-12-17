@@ -1,0 +1,8 @@
+island,name,coords,x_coord,y_coord,type,voltage,nearest_bus,dist_to_bus_m,notes_on_nearest_bus,capacity_mw,Gen Pot. Fraction ,gen_at_peak_demand_summer,gen_at_peak_demand_winter,,,MV
+Mallorca,Sa Pobla,,,,Solar PV,,9,,,900,,90,,,,
+Mallorca,Sine,,,,Solar PV,,8,,,720,,72,,,,
+Mallorca,Vilafranca,,,,Solar PV,,10,,,720,,72,,,,
+Mallorca,Lucmajor,,,,Solar PV,,5,,,500,,50,,,,
+Menorca,Ciutadella ,,,,Solar PV,,14,,,480,,48,,,,
+Ibiza,Formentera,,,,Solar PV,,0,,,300,,30,,,,
+Ibiza,Elvissa,"(38.919167, 1.430833)",1.430833,38.919167,Nat gas/diesel,,0,,,292,,218.7,,,,
