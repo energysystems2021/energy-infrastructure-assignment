@@ -1,0 +1,12 @@
+island,name,coords,x_coord,y_coord,type,voltage,nearest_bus,dist_to_bus_m,notes_on_nearest_bus,capacity_mw,Gen Pot. Fraction,gen_at_peak_demand_summer,gen_at_peak_demand_winter
+Ibiza,Elvissa,"(38.919167, 1.430833)",1.430833,38.919167,Nat gas/diesel,,0,0.429234,,292.00,,176.1,134.8
+Ibiza,Saint Francesco,"(38.691944, 1.463611)",1.463611,38.691944,Nat gas,,0,32663.65213,Connects by sea link,14.00,,0,7.8
+Mallorca,Son Reus,"(39.648611, 2.680000)",2.68,39.648611,Gas,220,4,343.832448,,432.80,0.32,0,234.94
+Mallorca,Cas Tresorer,"(39.567500, 2.689444)",2.689444,39.5675,Gas,220,5,3916.531035,,400.00,0.29,0,217.14
+Mallorca,Murterar,"(39.809722, 3.091944)",3.091944,39.809722,Coal/oil,220,8,74.167585,,527.80,0.39,0,286.52
+Menorca,Mahon (Mao),"(39.896944, 4.258611)",4.258611,39.896944,Oil,132,16,,,245.00,,83.2,64.6
+Ibiza,Ibiza,,,,Solar,,0,,,383.05,,80,0
+Mallorca,Son Reus,,,,Solar,,4,,,1123.60,,250,0
+Mallorca,Cas Tresorer,,,,Solar,,5,,,1340.68,,280,0
+Mallorca,Murterar,,,,Solar,,8,,,1615.80,,360,0
+Menorca,Mahon (Mao),,,,Solar,,16,,,258.21,,67.2,0
