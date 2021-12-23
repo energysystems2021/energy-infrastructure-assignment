@@ -1,0 +1,398 @@
+# Candidate Number 1060952
+# Energy Infrastructure 1 - Assignment Part 2
+# Country Group: Laos
+
+##### Import libraries and plotting functions #####
+
+import pandapower as pp
+from pandapower.plotting import simple_plot
+from pandapower.plotting.plotly import vlevel_plotly
+import pandas as pd
+import seaborn
+
+##### Creating the winter and summer peak conditions ######
+
+# Start with defining the number of homes per bus
+# The power flow will be modelled to represent balanced 3 phase AC
+# So one set of 3 houses will be represented as one bus
+
+homes_per_bus = 3
+
+# Create winter peak and summer peak conditions 
+# Switch for turning the solar on (Summer scenario) = 1
+# Or turning the solar off (Winter scenario) = 0
+
+solar_on_off = 0
+
+# Define the power at each bus during winter 
+
+admd_nominal = 0.005 * homes_per_bus # 5kW in MW (i.e. ADMD per household)
+
+# Define summer solar PV using a 20% efficency factor from: Sharp NQR258H panel - https://www.solaricashop.com/download/sharp/Sharp_NQR258H_Mono_BackContact_Datasheet_EN_V5.pdf
+# The PV generation is a negative load with q = 0, because it's only small domestic generation
+
+solar_capacity_peak = -0.004 * homes_per_bus # kWp in MW
+solar_efficiency = 0.20 
+
+# Calculation showing the net power at each bus depending on whether the solar is switched on or off
+
+power_net = admd_nominal
+if solar_on_off == 1:
+    power_net = admd_nominal + (solar_capacity_peak * solar_efficiency)
+
+print(f"*** The net power demand per domestic bus: {power_net}MW")
+
+##### Inputting transformer and line characteristics #####
+
+# Transformer capacities for the electrical distribution system:
+# 20 MVA 132kV to 11kV transformer - https://www.alibaba.com/product-detail/Good-price-NLTC-20mva-40mva-132kv_62510923459.html?spm=a2700.7724857.normal_offer.d_title.294a65e9f2gDs2
+# 300 KVA 11kV to 0.415kV transformer - https://www.alibaba.com/product-detail/Manufacturer-Direct-300-KVA-Oil-Immersed_60792483701.html
+
+primary_trafo_cap = 20 # 20MVA Primary transformer capacity
+secondary_trafo_cap = 0.3 # 300kVA Secondary transformer capacity
+
+# Define our three voltages, extra-high voltage (EHV), high voltage (HV), low voltage (LV)
+
+# Defining the Extra high voltage line coming in from the external grid = 132 kV
+# Defining the 11 kV high voltage transmission lines for the system 
+# Defining the 0.415 kV low voltage distribution lines for the system 
+
+V_nom_kV_EHV = 132.0
+V_nom_kV_HV = 11
+V_nom_kV_LV = 0.415
+
+# Defining the 11 kV and 0.415 kV line characteristics 
+
+# 11kV cable is the Eland D406013RD000 95mm2 3 core cable (Buried)
+# https://www.elandcables.com/media/1460428/enw-6-35-11-12-kv-single-core-triplex-unarmoured-aluminium-conductors.pdf\
+
+max_ka_hv = 0.231 #buried 
+r_ohm_km_hv = 0.411
+x_ohm_km_hv = 0.131 
+c_nf_km_hv = 1e-9 #negilible 
+
+# 0.415kV cable is the Eland A9SWA416 16mm2 4 core cable three phase AC (Buried) 
+# https://www.elandcables.com/media/3ljpmrxt/bs-5467-copper-conductor-multi-core-swa-pvc-basec-0-6-1kv-cable.pdf
+
+max_ka_lv = 0.075 #buried
+r_ohm_km_lv = 1.15  
+x_ohm_km_lv = 0.0 #negilible 
+c_nf_km_lv = 1e-9 #negilible 
+
+##### Creating lengths and geodata #####
+
+# Defining the home length and road dimensions(m)
+
+prop_length = 0.050
+rd_width = 0.010
+
+# Defining the lengths (km) between the Primary and Secondary transformers 
+
+length_trafo_A = 0.660 
+length_trafo_B = 0.420
+length_trafo_C = 0.650
+length_trafo_D = 0.300
+length_trafo_E = 0.310
+
+# Creating geodata for each of the parent buses in each block (0, A, B, etc.)
+
+geodata_0 = (-0.050,0.005)
+geodata_A = (-0.470,0.225)
+geodata_B = (-0.470,0.005)
+geodata_C = (-0.470,-0.215)
+geodata_D = (-0.100,0.255)
+geodata_E = (-0.100,-0.255)
+
+# Creating the 11 kV geometric paths (i.e. the cartesian coordinates of each 11 kV line leg)
+
+line_path_dict = {
+    "lineA": [(-0.050,0.005), (-0.210,0.005), (-0.210,0.225), (-0.470,0.225)],
+    "lineB": [(-0.050,0.005), (-0.470,0.005)],
+    "lineC": [(-0.050,0.005), (-0.210,0.005), (-0.210,-0.215), (-0.470,-0.215)],
+    "lineD": [(-0.050,0.005), (-0.100,0.005), (-0.100, 0.255)],
+    "lineE": [(-0.050,0.005), (-0.100,0.005), (-0.100,-0.255)]
+}
+
+##### Creating the distribution network #####
+
+# Create an empty network
+
+net = pp.create_empty_network()
+
+# Create the two buses needed either side of the primary and secondary transformers
+# Assign geodata to the buses so it can be plotted 
+
+bus0 = pp.create_bus(net, vn_kv=V_nom_kV_EHV, name="Bus_0",geodata=geodata_0)
+bus1 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_1",geodata=geodata_0)
+busA0 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_A0",geodata=geodata_A)
+busA1 = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_A1",geodata=geodata_A)
+busB0 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_B0",geodata=geodata_B)
+busB1 = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_B1",geodata=geodata_B)
+busC0 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_C0",geodata=geodata_C)
+busC1 = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_C1",geodata=geodata_C)
+busD0 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_D0",geodata=geodata_D)
+busD1 = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_D1",geodata=geodata_D)
+busE0 = pp.create_bus(net, vn_kv=V_nom_kV_HV, name="Bus_E0",geodata=geodata_E)
+busE1 = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_E1",geodata=geodata_E)
+
+# Create the external grid connection
+
+pp.create_ext_grid(net, bus=bus0, vm_pu=1.0, name="Swing bus")
+
+# Create the transformers using our own parameters: 
+# Primary transformer: Pfe (kW) = 1/100 x MVA(rated) x 1000 = 0.01 x 20 x 1000 = 200 (from Malcolm Mcculloch lecture)
+# Secondary transformer: Pfe (kW) = 1/100 x MVA(rated) x 1000 = 0.01 x 0.3 x 1000 = 3 (from Malcolm Mcculloch lecture) 
+
+trafo_0 = pp.create_transformer_from_parameters(net, hv_bus=bus0, lv_bus=bus1, sn_mva=primary_trafo_cap, vn_hv_kv=V_nom_kV_EHV, vn_lv_kv=V_nom_kV_HV, vkr_percent=1, vk_percent=10, pfe_kw=200, i0_percent=5, name="trafo_0")
+trafo_A = pp.create_transformer_from_parameters(net, hv_bus=busA0, lv_bus=busA1, sn_mva=secondary_trafo_cap, vn_hv_kv=V_nom_kV_HV, vn_lv_kv=V_nom_kV_LV, vkr_percent=1, vk_percent=10, pfe_kw=3, i0_percent=5, name="trafo_A")
+trafo_B = pp.create_transformer_from_parameters(net, hv_bus=busB0, lv_bus=busB1, sn_mva=secondary_trafo_cap, vn_hv_kv=V_nom_kV_HV, vn_lv_kv=V_nom_kV_LV, vkr_percent=1, vk_percent=10, pfe_kw=3, i0_percent=5, name="trafo_B")
+trafo_C = pp.create_transformer_from_parameters(net, hv_bus=busC0, lv_bus=busC1, sn_mva=secondary_trafo_cap, vn_hv_kv=V_nom_kV_HV, vn_lv_kv=V_nom_kV_LV, vkr_percent=1, vk_percent=10, pfe_kw=3, i0_percent=5, name="trafo_C")
+trafo_D = pp.create_transformer_from_parameters(net, hv_bus=busD0, lv_bus=busD1, sn_mva=secondary_trafo_cap, vn_hv_kv=V_nom_kV_HV, vn_lv_kv=V_nom_kV_LV, vkr_percent=1, vk_percent=10, pfe_kw=3, i0_percent=5, name="trafo_D")
+trafo_E = pp.create_transformer_from_parameters(net, hv_bus=busE0, lv_bus=busE1, sn_mva=secondary_trafo_cap, vn_hv_kv=V_nom_kV_HV, vn_lv_kv=V_nom_kV_LV, vkr_percent=1, vk_percent=10, pfe_kw=3, i0_percent=5, name="trafo_E")
+
+# Create the lines from the primary transformer to secondary transformers (A, B, C, D, and E)
+lineA = pp.create_line_from_parameters(net, from_bus=bus1, to_bus=busA0, length_km=length_trafo_A, r_ohm_per_km = r_ohm_km_hv, x_ohm_per_km = x_ohm_km_hv, c_nf_per_km = c_nf_km_hv, max_i_ka=max_ka_hv, name="line_A", geodata=line_path_dict["lineA"])
+lineB = pp.create_line_from_parameters(net, from_bus=bus1, to_bus=busB0, length_km=length_trafo_B, r_ohm_per_km = r_ohm_km_hv, x_ohm_per_km = x_ohm_km_hv, c_nf_per_km = c_nf_km_hv, max_i_ka=max_ka_hv, name="line_B", geodata=line_path_dict["lineB"])
+lineC = pp.create_line_from_parameters(net, from_bus=bus1, to_bus=busC0, length_km=length_trafo_C, r_ohm_per_km = r_ohm_km_hv, x_ohm_per_km = x_ohm_km_hv, c_nf_per_km = c_nf_km_hv, max_i_ka=max_ka_hv, name="line_C", geodata=line_path_dict["lineC"])
+lineD = pp.create_line_from_parameters(net, from_bus=bus1, to_bus=busD0, length_km=length_trafo_D, r_ohm_per_km = r_ohm_km_hv, x_ohm_per_km = x_ohm_km_hv, c_nf_per_km = c_nf_km_hv, max_i_ka=max_ka_hv, name="line_D", geodata=line_path_dict["lineD"])
+lineE = pp.create_line_from_parameters(net, from_bus=bus1, to_bus=busE0, length_km=length_trafo_E, r_ohm_per_km = r_ohm_km_hv, x_ohm_per_km = x_ohm_km_hv, c_nf_per_km = c_nf_km_hv, max_i_ka=max_ka_hv, name="line_E", geodata=line_path_dict["lineE"])
+
+##### Creating the geodata for each domestic bus in each block #####
+
+# Below the geometric blocks (x and y) are described for each domestic bus.
+
+def bus_geodata(bus_prefix, x, y):
+    
+    # Create an empty geodata dictionary
+    # This will be populated based on a particular housing group.
+    
+    geodata_dict = {}
+    
+    # Define each bus's geodata (i.e. x and y values) relative to the parent bus.
+    # Here the two building blocks are property length and road width.
+    
+    if bus_prefix == "A" or bus_prefix == "C":
+        geodata_dict = {
+            
+            # Top-left quadrant
+            
+            f"{bus_prefix}2":(x-5*prop_length, y+1*prop_length),
+            f"{bus_prefix}3":(x-3*prop_length, y+1*prop_length),
+            f"{bus_prefix}4":(x-2*prop_length, y+1*prop_length),
+            f"{bus_prefix}5":(x-0*prop_length, y+1*prop_length),
+            
+            # Top-right quadrant
+            
+            f"{bus_prefix}6":(x+4*prop_length, y+1*prop_length),
+            f"{bus_prefix}7":(x+3*prop_length, y+1*prop_length),
+            f"{bus_prefix}8":(x+1*prop_length, y+1*prop_length),
+            
+            # Bottom-left quadrant (Note the addition of the road width) 
+            
+            f"{bus_prefix}9":(x-3*prop_length, y-1*(prop_length + rd_width)),
+            f"{bus_prefix}10":(x-2*prop_length, y-1*(prop_length + rd_width)),
+            f"{bus_prefix}11":(x-0*prop_length, y-1*(prop_length + rd_width)),
+            
+            # Bottom-right quadrant (Note the addition of the road width)
+            
+            f"{bus_prefix}12":(x+4*prop_length, y-1*(prop_length + rd_width)),
+            f"{bus_prefix}13":(x+3*prop_length, y-1*(prop_length + rd_width)),
+            f"{bus_prefix}14":(x+1*prop_length, y-1*(prop_length + rd_width))
+        }
+    
+    elif bus_prefix == "B":
+        geodata_dict = {
+            
+            # Top-left quadrant
+            
+            "B2":(x-3*prop_length, y+1*prop_length),
+            "B3":(x-2*prop_length, y+1*prop_length),
+            "B4":(x-0*prop_length, y+1*prop_length),
+            
+            # Top-right quadrant
+            
+            "B5":(x+4*prop_length, y+1*prop_length),
+            "B6":(x+3*prop_length, y+1*prop_length),
+            "B7":(x+1*prop_length, y+1*prop_length),
+            
+            # Bottom-left quadrant (Note the addition of the road width)
+            
+            "B8":(x-5*prop_length, y-1*(prop_length + rd_width)), # This one includes the school
+            "B9":(x-3*prop_length, y-1*(prop_length + rd_width)),
+            "B10":(x-2*prop_length, y-1*(prop_length + rd_width)),
+            "B11":(x-0*prop_length, y-1*(prop_length + rd_width)),
+            
+            # Bottom-right quadrant (Note the addition of the road width)
+            
+            "B12":(x+4*prop_length, y-1*(prop_length + rd_width)),
+            "B13":(x+3*prop_length, y-1*(prop_length + rd_width)),
+            "B14":(x+1*prop_length, y-1*(prop_length + rd_width))
+        }
+    
+    elif bus_prefix == "D":
+        geodata_dict = {
+            
+            # Top-left quadrant (Note the addition of the road width)
+            
+            "D2":(x-1*(prop_length + rd_width), y+5*prop_length),
+            "D3":(x-1*(prop_length + rd_width), y+4*prop_length),
+            "D4":(x-1*(prop_length + rd_width), y+2*prop_length),
+            "D5":(x-1*(prop_length + rd_width), y+1*prop_length),
+            
+            # Top-right quadrant
+            
+            "D6":(x+1*prop_length, y+5*prop_length),
+            "D7":(x+1*prop_length, y+4*prop_length),
+            "D8":(x+1*prop_length, y+2*prop_length),
+            "D9":(x+1*prop_length, y+1*prop_length),
+            
+            # Bottom-left quadrant (Note the addition of the road width)
+            
+            "D10":(x-1*(prop_length + rd_width), y-4*prop_length),
+            "D11":(x-1*(prop_length + rd_width), y-2*prop_length),
+            "D12":(x-1*(prop_length + rd_width), y-1*prop_length),
+            
+            # Bottom-right quadrant
+            
+            "D13":(x+1*prop_length, y-4*prop_length),
+            "D14":(x+1*prop_length, y-2*prop_length),
+            "D15":(x+1*prop_length, y-1*prop_length)
+        }
+    
+    else:
+        geodata_dict = {
+            
+            # Top-left quadrant (Note the addition of the road width)
+            
+            "E2":(x-1*(prop_length + rd_width), y+4*prop_length),
+            "E3":(x-1*(prop_length + rd_width), y+2*prop_length),
+            "E4":(x-1*(prop_length + rd_width), y+1*prop_length),
+            
+            # Top-right quadrant
+            
+            "E5":(x+1*prop_length, y+4*prop_length),
+            "E6":(x+1*prop_length, y+2*prop_length),
+            "E7":(x+1*prop_length, y+1*prop_length),
+            
+            # Bottom-left quadrant (Note the addition of the road width)
+            
+            "E8":(x-1*(prop_length + rd_width), y-5*prop_length),
+            "E9":(x-1*(prop_length + rd_width), y-4*prop_length),
+            "E10":(x-1*(prop_length + rd_width), y-2*prop_length),
+            "E11":(x-1*(prop_length + rd_width), y-1*prop_length),
+            
+            # Bottom-right quadrant
+            
+            "E12":(x+1*prop_length, y-5*prop_length),
+            "E13":(x+1*prop_length, y-4*prop_length),
+            "E14":(x+1*prop_length, y-2*prop_length),
+            "E15":(x+1*prop_length, y-1*prop_length)
+        }
+    
+    return geodata_dict
+
+##### Creating the buses and loads #####
+
+# Here a function is created that takes a single parent bus (an outlet from a secondary transformer),
+# and adds an individual property (child) bus and connecting lines.
+
+# Create the function definition (Solar is off (0) by default)
+
+def bus_builder(parent_bus, bus_prefix, bus_coords):
+    
+    # Set the local constants and variables (i.e. those not passed as arguments)
+    
+    x = bus_coords[0] # The x coordinate of the parent bus
+    y = bus_coords[1] # The y coordinate of the parent bus
+    
+    # Looping through each bus geodata group and adding domestic service buses (each one representing three homes)
+    # If bus_prefix == "A":
+    
+    geodata_dict = bus_geodata(bus_prefix, x, y)
+        
+    # Looping through bus geodata dictionary and creating a bus, load and connecting line for each:
+    
+    for i in geodata_dict:
+        
+        # Create a bus (domestic / child)
+        
+        bus = pp.create_bus(net, vn_kv=V_nom_kV_LV, name="Bus_"+str(i), geodata=(geodata_dict[i][0], geodata_dict[i][1]))
+        
+        # Create a load and attach it to the bus
+        # Here a power factor of 0.9 is assumed (pf= 0.9)
+        # Theta = 25.842
+        # Reactive power Q (VAR) = P x tan theta 
+        # tan(theta)=0.484
+        
+        pp.create_load(net, bus=bus, p_mw=power_net, q_mvar=0.484*power_net, name=f"load_{i}")
+        
+        # Create temporary variables to enable calculation of line length
+        
+        x_bus = geodata_dict[i][0]
+        y_bus = geodata_dict[i][1]
+        line_length = abs(x - x_bus) + abs(y - y_bus)
+        
+        # If the parent bus is either D or E, then the line will follow a slightly different geometric path:
+        
+        if bus_prefix == "D" or bus_prefix == "E":
+            pp.create_line_from_parameters(net, from_bus=parent_bus, to_bus=bus,length_km=line_length, r_ohm_per_km = r_ohm_km_lv, x_ohm_per_km = x_ohm_km_lv, c_nf_per_km = c_nf_km_lv, max_i_ka=max_ka_lv, name=f"line_{str(i)}", geodata=[(x,y),(x,y_bus),(x_bus,y_bus)])
+        else:
+            pp.create_line_from_parameters(net, from_bus=parent_bus, to_bus=bus,length_km=line_length, r_ohm_per_km = r_ohm_km_lv, x_ohm_per_km = x_ohm_km_lv, c_nf_per_km = c_nf_km_lv, max_i_ka=max_ka_lv, name=f"line_{str(i)}", geodata=[(x,y),(x_bus,y),(x_bus,y_bus)])
+
+# Now the above function is used to populate the domestic (child) buses and lines.
+# Here the function is called once per parent bus (A, B, etc.), and the function does the rest.
+
+bus_builder(busA1, "A", geodata_A)
+bus_builder(busB1, "B", geodata_B)
+bus_builder(busC1, "C", geodata_C)
+bus_builder(busD1, "D", geodata_D)
+bus_builder(busE1, "E", geodata_E)
+
+##### Showing the Bus and line results #####
+
+# Allow pands to show all results in a table
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+
+# Printing the bus characteristics  
+
+net.bus
+
+# Printing the line characteristics 
+
+net.line
+
+# Run the distribution network using newton-raphson 
+
+pp.runpp(net, algorithm="nr"); 
+
+# Printing the bus results
+# This shows the voltage at each bus 
+
+net.res_bus
+
+# Printing the line results
+# This shows the loading on each line 
+
+net.res_line
+
+##### Plotting the network results #####
+
+vlevel_plotly(net)
+
+# Plotting line loading and bus voltage data graphically 
+
+pp.runpp(net);
+
+colors = seaborn.color_palette()
+
+bc = pp.plotting.create_bus_collection(net, buses=net.res_bus.index, size=0.01, patch_type='circle', color=colors[0], cmap='seismic', norm=None, \
+                                       infofunc=None, picker=False, bus_geodata=None, cbar_title='Bus Voltage [pu]')
+lc = pp.plotting.create_line_collection(net, lines=net.res_line.index, color=colors[0], line_geodata=None, bus_geodata=None,\
+                                        use_bus_geodata=False, infofunc=None, cmap='afmhot', norm=None, picker=False, z=None, cbar_title='Line Loading [%]', clim=(0,100), plot_colormap=True)
+
+pp.plotting.draw_collections([bc, lc])
+
+plt.show()
+
