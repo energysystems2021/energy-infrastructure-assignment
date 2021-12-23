@@ -1,0 +1,416 @@
+# Energy Infrastructure
+# Part 1: Balearic Islands
+# Candidate Number: 1060952
+
+##### General information and assumptions #####
+
+# All data is sourced and extracted from the Shared data folder for the Balearic Islands on the Github 
+# The worst case scenarios for summer and winter were selected (i.e. dates demand was greatest)
+# This data was gathered through the Red Eléctrica de Espana website: https://demanda.ree.es/visiona/baleares/baleares/total
+# In this powerflow the summer worst case scenario is run, as winter demand is significantly less 
+# The maximum demand in winter and summer were identified as:
+# Summer (9th Aug 2019 @ 13:31): 1303MW
+# Winter (22nd Jan 2019 @ 20.24): 956MW
+# The total load for the island is divided across the buses according to the proportion of population surrounding that area
+
+##### Importing libraries and modules #####
+
+import pandas as pd
+import pandapower as pp
+from pandapower import plotting
+from pandapower.plotting import simple_plotly, pf_res_plotly
+import numpy as np
+import matplotlib.pyplot as plt
+import math
+import numba
+import seaborn
+
+##### Create an empty network #####
+
+net = pp.create_empty_network()
+
+##### Creation of the buses for the network #####
+
+# A total of 18 buses have been created across the 4 Balearic Islands
+# These buses have been created using shared data which can be found on Github
+# Geodata has been added for each bus in order to place it on a map  
+
+V_l_kv = 132 # Medium voltage lines in kV
+V_h_kv = 220 # Higher voltage lines in kV
+V_kv=66 # Lower voltage line in kV 
+
+b0 = pp.create_bus(net,  vn_kv = V_l_kv,  name = "Bus 0", geodata = ((1.430833, 38.91917))) #  Ibiza +Formentura bus 
+b1 = pp.create_bus(net,  vn_kv = V_l_kv,  name = "Bus 1_h", geodata = ((2.506454, 39.53525))) # Santa Ponca bus (132)(slack bus that receives power from Spanish mainland)
+b2 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 1_l", geodata = ((2.507937, 39.53662))) # Santa Ponca bus (220)
+b3 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 2", geodata = ((2.549167, 39.58417)))   # Valldurgent bus
+b4 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 3", geodata = ((2.678889, 39.65083)))    # Son Reus 
+b5= pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 4_h", geodata = ((2.724617, 39.56686)))  # Portol bus (Cas tresorer) (220) 
+b5_1 = pp.create_bus(net,  vn_kv = V_kv,  name = "Bus 4_l", geodata = ((2.724617, 39.56686)))  # Portol bus (Cas tresorer) (66)
+b6 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 5", geodata = ((2.744444, 39.60028)))    # Son Orlandis bus 
+b7 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 6", geodata = ((3.039444, 39.67333)))    # Llubi bus
+b8 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 7", geodata = ((3.0925, 39.80944)))     # Murterar bus
+b9 = pp.create_bus(net,  vn_kv = V_h_kv,  name = "Bus 8_h", geodata = ((3.158056, 39.58194)))   # Es Bessons bus (220)
+b10 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 8_l", geodata = ((3.159638, 39.58209)))   # Es Bessons bus (132) 
+b11= pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 9", geodata = ((3.427024, 39.73827)))      # Cala Mesquida bus 
+b12 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 10", geodata = ((3.834227, 39.93175)))     # Cala en Bosch bus
+b13 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 11", geodata = ((3.855278, 40.00333)))     # Cuitadella bus
+b14 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 12", geodata = ((4.095556, 39.97694)))     # Es Mercadal bus
+b15 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 13", geodata = ((4.236667, 39.89111)))     # Dragonera bus 
+b16 = pp.create_bus(net, vn_kv = V_l_kv, name = "Bus 14", geodata = ((4.258155, 39.89706)))     # Mao bus
+
+##### Printing the buses #####
+
+net.bus
+
+##### Creating the loads ##### 
+
+# These loads have been created based on shared data which can be found on Github
+# This is based on the summer scenario for peak 24-hour energy consumption: 9 Aug 2019 = 1303 MW
+# The load on each bus has been estimated and apportioned based on the surrounding population
+# Load data was determined using Wikipedia for population statistics and data from the Red Eléctrica de España 
+
+# Here a power factor of 0.9 is assumed (pf= 0.9)
+# Theta = 25.842
+# Reactive power Q (VAR) = P x tan theta 
+# tan(theta)=0.484
+
+pp.create_load(net, bus=b0, p_mw = 175.42, q_mvar = 84.96)
+pp.create_load(net, bus=b1, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b3, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b4, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b5_1, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b6, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b7, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b8, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b10, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b11, p_mw = 113.05, q_mvar = 54.75)
+pp.create_load(net, bus=b12, p_mw = 7.67, q_mvar = 3.71)
+pp.create_load(net, bus=b13, p_mw = 32.71, q_mvar = 15.84)
+pp.create_load(net, bus=b14, p_mw = 22.24, q_mvar = 10.77)
+pp.create_load(net, bus=b15, p_mw = 15.60, q_mvar = 7.55)
+pp.create_load(net, bus=b16, p_mw = 31.84, q_mvar = 15.42)
+
+##### Creating different solar farm & storage scenarios #####
+
+# In this section, various solar farms and battery storage have been created with different power capacities at different buses
+# This was an iterative process, playing around with different power capacities at different bus locations until a solution was realized, making sure existing lines and transformers were not overloaded 
+# Using the solar scenarios switch created below, solar_scenarios = 1 comes up with the final proposed optimum solution 
+
+# Solar Scenarios switch:
+# solar_scenarios = 0 (This represents the current transmission network with no solar or storage added)
+# solar_scenarios = 1 (This represents the optimum solution of floating solar + solar field farms + battery storage)
+# solar_scenarios = 2 (This represents a solution that did not work with overloading of lines and transformers) 
+
+solar_scenarios = 1 
+
+##### Further notes and assumptions for generation data #####
+
+# All the generation data created for the current network was extracted from the shared data on Github 
+# The total amount of power generated was taken as the peak amount generated on the 9th of August 2019 (13:31)
+# The total power generated on the 9th of august is equivalent to 1296MW
+# Over a 24 hour period this represents 1296 x 24 = 31104 MWh
+# Solar energy required to meet 80% of that demand is therefore 24883MWh
+# Assuming the solar panels generate power at peak capacity for 9 hours, the solar panels will need to have a total power capacity of 2760MW
+# It is assumed that the storage capacity represents over 50% of the power capacity on the island at 1705MW
+# In the optimum scenario (1) both generation sources on Ibiza, on bus 0, are maintained to supply the rest of the daily energy demand ie <20%
+# All other fossil fuel generation has been switched off (and put on standby for emergencies)
+# When solar farms are added, the grid will have a total power capacity of 2990.7 MW
+# Using the general rule of thumb that a 1 MW of Solar Farm requires 4 acres = 0.0161874 km2, the space requirement has also been calculated - http://www.suncyclopedia.com/en/area-required-for-solar-pv-power-plants/
+# This shows that 2990 MW will require 2990 x 0.0161874 km2 = 48.4 km2 total
+
+if solar_scenarios==0:
+    pp.create_gen(net, bus=b0, p_mw = 218.70, name = "Elvissa, Ibiza")
+    pp.create_gen(net, bus=b0, p_mw = 12, name = "San Francesco, Ibiza")
+    pp.create_gen(net, bus=b4, p_mw = 303.2, name = "Son Reus, Mallorca")
+    pp.create_gen(net, bus=b5, p_mw = 280.05, name = "Cas Tresorer, Mallorca ")
+    pp.create_gen(net, bus=b8, p_mw = 369.53, name = "Murterar, Mallorca")
+    pp.create_gen(net, bus=b16, p_mw = 113.2, name = "Mahon (Mao), Mernoca")
+    
+elif solar_scenarios==2:
+    pp.create_gen(net, bus=b0, p_mw = 218.70, name = "Elvissa, Ibiza")
+    pp.create_gen(net, bus=b0, p_mw = 12, name = "San Francesco, Ibiza")
+    pp.create_gen(net, bus=b0, p_mw = 60, name = "Floating Solar Farm 1")
+    pp.create_gen(net, bus=b13, p_mw = 12, name = "Floating Solar Farm 1")
+    pp.create_gen(net, bus=b2, p_mw = 10, name = "Floating Solar Farm 2")
+    pp.create_gen(net, bus=b5, p_mw = 500, name = "Floating Solar Farm 3")
+    pp.create_gen(net, bus=b8, p_mw = 500, name = "Floating Solar Farm 4")
+    pp.create_gen(net, bus=b11, p_mw = 341, name = "Floating Solar Farm 5")
+    pp.create_gen(net, bus=b12, p_mw = 50, name = "Floating Solar Farm 6")
+    pp.create_gen(net, bus=b16, p_mw = 150, name = "Floating Solar Farm 7")
+    pp.create_gen(net, bus=b5, p_mw = 131, name = "Solar Field Farm 1")
+    pp.create_gen(net, bus=b7, p_mw = 331, name = "Solar Field Farm 2")
+    pp.create_gen(net, bus=b9, p_mw = 301, name = "Solar Field Farm 3")
+    pp.create_gen(net, bus=b10, p_mw = 359, name = "Solar Field Farm 4")
+    pp.create_gen(net, bus=b15, p_mw = 70, name = "Solar Field Farm 5")
+    pp.create_storage(net, bus=b4, p_mw=350, max_e_mwh= 350*4,name = "Storage 1")
+    pp.create_storage(net, bus=b14, p_mw=170, max_e_mwh= 170*4,name = "Storage 2")
+    pp.create_storage(net, bus=b3, p_mw=300, max_e_mwh= 300*4,name = "Storage 3")
+    pp.create_storage(net, bus=b7, p_mw=340, max_e_mwh= 340*4,name = "Storage 4")
+    pp.create_storage(net, bus=b8, p_mw=345, max_e_mwh= 345*4,name = "Storage 5")
+    pp.create_storage(net, bus=b5, p_mw=200, max_e_mwh= 200*4,name = "Storage 6")
+    
+else:
+    pp.create_gen(net, bus=b0, p_mw = 218.70, name = "Elvissa, Ibiza")
+    pp.create_gen(net, bus=b0, p_mw = 12, name = "San Francesco, Ibiza")
+    pp.create_gen(net, bus=b0, p_mw = 60, name = "Floating Solar Farm 1 - at Bus 0") # 60 x 0.0161874 = 0.97 km2
+    pp.create_gen(net, bus=b4, p_mw = 150, name = "Solar Field Farm 1 - at Bus 4 ") # 150 x 0.0161874 = 2.43 km2
+    pp.create_gen(net, bus=b5, p_mw = 500, name = "Floating Solar Farm 2 - at Bus 5") # 500 x 0.0161874 = 8.09 km2
+    pp.create_gen(net, bus=b6, p_mw = 10, name = "Solar Field Farm 2 - at Bus 6 ") # 10 x 0.0161874 = 0.16 km2
+    pp.create_gen(net, bus=b7, p_mw = 570, name = "Solar Field Farm 3 - at Bus 7") # 570 x 0.0161874 = 9.22 km2
+    pp.create_gen(net, bus=b8, p_mw = 520, name = "Floating Solar Farm 3 - at Bus 8 ") # 520 x 0.0161874 = 8.42 km2
+    pp.create_gen(net, bus=b10, p_mw = 550, name = "Solar Field Farm 4 - at Bus 10") # 550 x 0.0161874 = 8.90 km2
+    pp.create_gen(net, bus=b14, p_mw = 400, name ="Solar Field Farm 5 - at Bus 14") # 400 x 0.0161874 = 6.47 km2
+    pp.create_storage(net, bus=b3, p_mw=300, max_e_mwh= 300*4,name = "Storage 1 - at Bus 3")
+    pp.create_storage(net, bus=b4, p_mw=350, max_e_mwh= 350*4,name = "Storage 2 - at Bus 4")
+    pp.create_storage(net, bus=b5, p_mw=200, max_e_mwh= 200*4,name = "Storage 3 - at Bus 5")
+    pp.create_storage(net, bus=b7, p_mw=340, max_e_mwh= 340*4,name = "Storage 4 - at Bus 7")
+    pp.create_storage(net, bus=b8, p_mw=345, max_e_mwh= 345*4,name = "Storage 5 - at Bus 8")
+    pp.create_storage(net, bus=b14, p_mw=170, max_e_mwh= 170*4,name = "Storage 6 - at Bus 14")
+   
+    
+    #pp.create_gen(net, bus=b0, p_mw = 218.70, name = "Elvissa, Ibiza")
+    #pp.create_gen(net, bus=b0, p_mw = 12, name = "San Francesco, Ibiza")
+    #pp.create_gen(net, bus=b0, p_mw = 60, name = "Floating Solar Farm 1") # 60 x 0.0161874 = 0.97 km2
+    #pp.create_gen(net, bus=b5, p_mw = 510, name = "Floating Solar Farm 2") # 510 x 0.0161874 = 8.26 km2
+    #pp.create_gen(net, bus=b8, p_mw = 550, name = "Floating Solar Farm 3 ") # 550 x 0.0161874 = 8.90 km2
+    #pp.create_gen(net, bus=b11, p_mw = 300, name ="Floating Solar Farm 4") # 300 x 0.0161874 = 4.86 km2
+    #pp.create_gen(net, bus=b4, p_mw = 150, name = "Solar Field Farm 1 ") # 150 x 0.0161874 = 2.42 km2
+    #pp.create_gen(net, bus=b7, p_mw = 440, name = "Solar Field Farm 2 ") # 440 x 0.0161874 = 7.12 km2
+    #pp.create_gen(net, bus=b10, p_mw = 450, name = "Solar Field Farm 3 ") # 450 x 0.0161874 = 7.28 km2
+    #pp.create_gen(net, bus=b14, p_mw = 300, name ="Solar Field Farm 4") # 300 x 0.0161874 = 4.65 km2
+    #pp.create_storage(net, bus=b4, p_mw=350, max_e_mwh= 350*4,name = "Storage 1")
+    #pp.create_storage(net, bus=b14, p_mw=170, max_e_mwh= 170*4,name = "Storage 2")
+    #pp.create_storage(net, bus=b3, p_mw=300, max_e_mwh= 300*4,name = "Storage 3")
+    #pp.create_storage(net, bus=b7, p_mw=340, max_e_mwh= 340*4,name = "Storage 4")
+    #pp.create_storage(net, bus=b8, p_mw=345, max_e_mwh= 345*4,name = "Storage 5")
+    #pp.create_storage(net, bus=b5, p_mw=200, max_e_mwh= 200*4,name = "Storage 6")
+    
+# p_mw = The momentary active power of the storage (positive for charging, negative for discharging)
+# max_e_mwh (float) = The maximum energy content of the storage (maximum charge level)
+
+
+# Bus 1 located on Mallorca is a positive generator as it "generates" energy by receiving it from the mainland and sends it into the grid
+# This has an angle of 0 and all the other angles are relative to it 
+
+pp.create_ext_grid(net, bus=b1, vm_pu=1.00, name="Slack bus")
+
+##### Creating the transformers #####
+
+# Create 220kV/132kV transformer (Bus 1: Santa Ponca 132kV to Bus 2: Santa Ponca 220kV) 
+# Data for this was taken from - https://webcache.googleusercontent.com/search?q=cache:PfkXz7nbfc4J:https://www.ree.es/sites/default/files/01_ACTIVIDADES/Documentos/Anexo-I-y-II-Baleares_H2015-2020.xlsx+&cd=2&hl=en&ct=clnk&gl=uk
+# Using (100 MVA) 220/110kV standard type parameters 
+
+sn_mva = 320       
+vn_hv_kv = 132 
+vn_lv_kv = 220
+vk_percent = 12
+vkr_percent = 0.26
+pfe_kw = 55
+i0_percent = 0.06 
+
+pp.create_transformer_from_parameters(net, hv_bus=b1, lv_bus=b2, sn_mva=sn_mva, vn_hv_kv=vn_hv_kv, vn_lv_kv=vn_lv_kv, vkr_percent=vkr_percent, vk_percent=vk_percent, pfe_kw=pfe_kw, i0_percent=i0_percent)
+
+# Create 220kV/66kV transformer (Bus 5 to Bus 5.1 in Portol (Cas Tresorer)) 
+# Data for this was taken from - https://webcache.googleusercontent.com/search?q=cache:PfkXz7nbfc4J:https://www.ree.es/sites/default/files/01_ACTIVIDADES/Documentos/Anexo-I-y-II-Baleares_H2015-2020.xlsx+&cd=2&hl=en&ct=clnk&gl=uk
+# Using (100 MVA) 220/110 kV standard type parameters
+
+sn_mva = 480
+vn_hv_kv = 220
+vn_lv_kv = 66
+vk_percent = 12
+vkr_percent = 0.26
+pfe_kw = 55
+i0_percent = 0.06
+
+pp.create_transformer_from_parameters(net, hv_bus=b5, lv_bus=b5_1, sn_mva=sn_mva, vn_hv_kv=vn_hv_kv, vn_lv_kv=vn_lv_kv, vkr_percent=vkr_percent, vk_percent=vk_percent, pfe_kw=pfe_kw, i0_percent=i0_percent)
+
+# Create 220kV/132kV transformer (bus 10 to bus 11 in Es Bessons)
+# Data for this was taken from - https://www.ree.es/sites/default/files/04_SOSTENIBILIDAD/Documentos/tramitacion_ambiental/EIA/Doc_Sintesis-Arta-Bessons-L-Arta-Mesquida-Dic16.pdf p9
+# Using (100 MVA) 220/110 kV standard type parameters
+
+sn_mva = 446       
+vn_hv_kv = 220
+vn_lv_kv = 132
+vk_percent = 12
+vkr_percent = 0.26
+pfe_kw = 55
+i0_percent = 0.06
+
+pp.create_transformer_from_parameters(net, hv_bus=b9, lv_bus=b10, sn_mva=sn_mva, vn_hv_kv=vn_hv_kv, vn_lv_kv=vn_lv_kv, vkr_percent=vkr_percent, vk_percent=vk_percent, pfe_kw=pfe_kw, i0_percent=i0_percent)
+
+##### Printing the loads #####
+
+net.load
+
+##### Printing the generation #####
+
+net.gen
+
+##### Printing the battery storage #####
+
+if solar_scenarios ==1:
+    print(net.storage)
+
+##### Printing the transformers #####
+
+net.trafo
+
+##### Creating the lines #####
+
+# Line data was extracted from the shared data found on Github
+# Some of this data has come from reviewing data in QGIS software and overpass-turbo.eu 
+# Large (condor) lines from Eland cables were initally used to assess the line loading on land 
+# If the loading was too small or too great alternative lines would have been selected
+# Running the powerflow showed Condor Eland cables to have an acceptable line loading level
+# Condor Eland cable can be found: https://www.elandcables.com/media/38193/acsr-astm-b-aluminium-conductor-steel-reinforced.pdf
+# The underwater cables connecting the islands are ABB XLPE submarine cables
+# For the underwater cables, capacitance and inductance values have been retrieved from ABB 
+# For all other cables a capacitance of 1 nanofarad is assumed (effectively negligible)
+
+# Creation of line geodata
+
+loc_b0=(1.430833, 38.91917)
+loc_b1=(2.506454, 39.53525)
+loc_b2=(2.507937, 39.53662)
+loc_b3=(2.549167, 39.58417)
+loc_b4=(2.678889, 39.65083)
+loc_b5=(2.724617, 39.56686)
+loc_b5_1=(2.724617, 39.56686)
+loc_b6=(2.744444, 39.60028)
+loc_b7=(3.039444, 39.67333)
+loc_b8=(3.0925, 39.80944)
+loc_b9=(3.158056, 39.58194)
+loc_b10=(3.159638, 39.58209)
+loc_b11=(3.427024, 39.73827)
+loc_b12=(3.834227, 39.93175)
+loc_b13=(3.855278, 40.00333)
+loc_b14=(4.095556, 39.97694)
+loc_b15=(4.236667, 39.89111)
+loc_b16=(4.258155, 39.89706)
+
+r_ohm = 0.07283 # line resistance for Condor cables in ohm per km
+
+pp.create_line_from_parameters(net,from_bus=b0, to_bus=b1,length_km=126, r_ohm_per_km = 0.053, x_ohm_per_km = 0.119, c_nf_per_km = 1.7e-9, max_i_ka=0.545,geodata = [loc_b0, loc_b1]) # This is an underwater cable
+pp.create_line_from_parameters(net,from_bus=b2, to_bus=b3,length_km=5.599, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b2, loc_b3])
+pp.create_line_from_parameters(net,from_bus=b3, to_bus=b4,length_km=15.05, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b3, loc_b4])
+pp.create_line_from_parameters(net,from_bus=b4, to_bus=b6,length_km=9.41, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b4, loc_b6])
+pp.create_line_from_parameters(net,from_bus=b3, to_bus=b4,length_km=14.89, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b3, loc_b4])
+pp.create_line_from_parameters(net,from_bus=b6, to_bus=b5,length_km=4.357, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b6, loc_b5])
+pp.create_line_from_parameters(net,from_bus=b6, to_bus=b7,length_km=28.906, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b6, loc_b7])
+pp.create_line_from_parameters(net,from_bus=b4, to_bus=b7,length_km=33.830, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b4, loc_b7])
+pp.create_line_from_parameters(net,from_bus=b7, to_bus=b8,length_km=16.77, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b7, loc_b8])
+pp.create_line_from_parameters(net,from_bus=b7, to_bus=b8,length_km=16.06, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b7, loc_b8])
+pp.create_line_from_parameters(net,from_bus=b7, to_bus=b9,length_km=15.177, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b7, loc_b9])
+pp.create_line_from_parameters(net,from_bus=b7, to_bus=b9,length_km=14.954, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.321, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b7, loc_b9])
+pp.create_line_from_parameters(net,from_bus=b10, to_bus=b11,length_km=30.276, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b10, loc_b11])
+pp.create_line_from_parameters(net,from_bus=b11, to_bus=b12,length_km=52.942, r_ohm_per_km = 0.053, x_ohm_per_km = 0.119, c_nf_per_km = 1.7e-9, max_i_ka=0.545,geodata = [loc_b11, loc_b12]) # This is an underwater cable
+pp.create_line_from_parameters(net,from_bus=b12, to_bus=b13,length_km=8.201, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b12, loc_b13])
+pp.create_line_from_parameters(net,from_bus=b13, to_bus=b15,length_km=35.54, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b13, loc_b15])
+pp.create_line_from_parameters(net,from_bus=b13, to_bus=b14,length_km=21.132, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b13, loc_b14])
+pp.create_line_from_parameters(net,from_bus=b14, to_bus=b15,length_km=15.439, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b14, loc_b15])
+pp.create_line_from_parameters(net,from_bus=b15, to_bus=b16,length_km=4.712, r_ohm_per_km = r_ohm, x_ohm_per_km = 0.306, c_nf_per_km = 1e-9, max_i_ka=0.975,geodata = [loc_b15, loc_b16])
+
+##### Printing the lines #####
+
+net.line
+
+##### Running the Panda Power Power Flow Analysis #####
+
+# Using newton-raphson
+
+pp.runpp(net,algorithm='nr');  
+
+##### Printing the bus results #####
+
+net.res_bus
+
+##### Printing the line results #####
+
+net.res_line
+
+##### Printing the transformer results #####
+
+net.res_trafo
+
+##### Printing the external grid results #####
+
+net.res_ext_grid
+
+##### Printing the load results #####
+
+net.res_load
+
+##### Printing the generator results #####
+
+net.res_gen
+
+##### Printing the elements of the network #####
+
+net
+
+##### Plotting the results #####
+
+simple_plotly(net)
+
+##### Getting Per Unit values for part a) #####
+
+S_base=480000000 #Rated power (Highest Apparent Power between the three transformers)
+V_base220=220000 #Base voltage 
+V_base132=132000 #Base Voltage
+
+# Calculating the base impedances
+
+Z_base220=V_base220**2/S_base
+Z_base132=V_base132**2/S_base
+
+# Creation of the list to place the results
+
+x_pu=list(range(19))
+r_pu=list(range(19))
+p_pu=list(range(19))
+
+# Arrays of the line parameters
+
+line_info_r_ohm = np.array([0.053,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.07283,0.053,0.07283,0.07283,0.07283,0.07283,0.07283],dtype=float)
+line_info_x_ohm = np.array([0.119,0.321,0.321,0.321,0.321,0.321,0.321,0.321,0.321,0.321,0.321,0.321,0.306,0.119,0.306,0.306,0.306,0.306,0.306],dtype=float)
+line_info_voltage = np.array([132,220,220,220,220,220,220,220,220,220,220,220,132,132,132,132,132,132,132],dtype=float)
+line_info_maxka= np.array([0.545,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.975,0.545,0.975,0.975,0.975,0.975,0.975],dtype=float)
+
+# Calculation of r,x and P in "pu"
+
+for i in range(19):
+    if line_info_voltage[i]==132:
+        Z_base=Z_base132
+    else:
+        Z_base=Z_base220
+    x_pu[i]=line_info_x_ohm[i]/Z_base*100
+    r_pu[i]=line_info_r_ohm[i]/Z_base*100
+    p_pu[i]=(line_info_voltage[i]*line_info_maxka[i])/S_base*1E6
+    
+
+line_pu=pd.DataFrame({'x_pu':x_pu, 'r_pu':r_pu, 'p_pu':p_pu})
+line_pu
+
+##### Plotting an advanced visual of the network showing the line loading results and Bus voltage pu #####
+
+import pandapower.plotting as plot
+import matplotlib.pyplot as plt
+import seaborn
+
+# Creating the line colour collection
+
+cmap_list=[(20, "yellow"), (40, "orange"), (100, "red")]
+cmap, norm = plot.cmap_continuous(cmap_list)
+lc = plot.create_line_collection(net, net.line.index, zorder=1, cmap=cmap, norm=norm, linewidths=2)
+
+# Creating the bus colour collection
+
+cmap_list=[(0.9, "yellow"), (0.9, "blue"), (1.0, "green")]
+cmap, norm = plot.cmap_continuous(cmap_list)
+bc = plot.create_bus_collection(net, net.bus.index, size=0.02, zorder=2, cmap=cmap, norm=norm)
+
+plot.draw_collections([lc, bc], figsize=(10,4))
+
+##### Exporting the results to excel #####
+
+pp.to_excel(net, "balearicresults.xlsx") 
